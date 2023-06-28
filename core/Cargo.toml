@@ -70,6 +70,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 trees = { workspace = true }
+tracy-client = { workspace = true }
 
 [dev-dependencies]
 fs_extra = { workspace = true }

@@ -2046,6 +2046,7 @@ impl Bank {
         slot: Slot,
         data_source: CalcAccountsHashDataSource,
     ) -> Self {
+        
         let _span = span!("warp_from_parent");
         parent.freeze();
         parent
@@ -4709,6 +4710,7 @@ impl Bank {
     /// reaches its max tick height. Can be called by tests to get new blockhashes for transaction
     /// processing without advancing to a new bank slot.
     pub fn register_recent_blockhash(&self, blockhash: &Hash) {
+        let _span = span!("register_recent_blockhash");
         // Only acquire the write lock for the blockhash queue on block boundaries because
         // readers can starve this write lock acquisition and ticks would be slowed down too
         // much if the write lock is acquired for each tick.
@@ -8237,6 +8239,8 @@ impl Bank {
         execution_results: &[TransactionExecutionResult],
         loaded_txs: &[TransactionLoadResult],
     ) {
+        let _span =  span!("update_stakes_cache");
+        
         for (i, ((load_result, _load_nonce), tx)) in loaded_txs.iter().zip(txs).enumerate() {
             if let (Ok(loaded_transaction), true) = (
                 load_result,

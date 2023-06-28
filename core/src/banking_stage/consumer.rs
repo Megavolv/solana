@@ -32,6 +32,7 @@ use {
         time::Instant,
     },
 };
+use tracy_client::{frame_mark, frame_name, plot, span, Client, span_location};  
 
 /// Consumer will create chunks of transactions from buffer with up to this size.
 pub const TARGET_NUM_TRANSACTIONS_PER_BATCH: usize = 64;
@@ -352,6 +353,8 @@ impl Consumer {
                 should_bank_still_be_processing_txs,
             ) {
                 (Err(PohRecorderError::MaxHeightReached), _) | (_, false) => {
+                    let _span = span!("process transactions: max slot height reached");
+                    
                     info!(
                         "process transactions: max height reached slot: {} height: {}",
                         bank.slot(),
@@ -361,6 +364,7 @@ impl Consumer {
                     // transactions[chunk_start..chunk_end], so we just need to push the remaining
                     // transactions into the unprocessed queue.
                     all_retryable_tx_indexes.extend(chunk_end..transactions.len());
+
                     reached_max_poh_height = true;
                     break;
                 }

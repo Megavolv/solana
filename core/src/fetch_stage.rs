@@ -1,5 +1,6 @@
 //! The `fetch_stage` batches input from a UDP socket and sends it to a channel.
 
+use tracy_client::{frame_mark, frame_name, plot, span, span_location, Client};
 use {
     crate::result::{Error, Result},
     crossbeam_channel::{unbounded, RecvTimeoutError},
@@ -38,6 +39,8 @@ impl FetchStage {
         poh_recorder: &Arc<RwLock<PohRecorder>>,
         coalesce: Duration,
     ) -> (Self, PacketBatchReceiver, PacketBatchReceiver) {
+        let _span = span!("FetchStage::new");
+
         let (sender, receiver) = unbounded();
         let (vote_sender, vote_receiver) = unbounded();
         let (forward_sender, forward_receiver) = unbounded();
@@ -152,6 +155,9 @@ impl FetchStage {
         in_vote_only_mode: Option<Arc<AtomicBool>>,
         tpu_enable_udp: bool,
     ) -> Self {
+
+        let _span = span!("new_multi_socket");
+
         let recycler: PacketBatchRecycler = Recycler::warmed(1000, 1024);
 
         let tpu_stats = Arc::new(StreamerReceiveStats::new("tpu_receiver"));
