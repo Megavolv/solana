@@ -191,6 +191,7 @@ use {
         time::{Duration, Instant},
     },
 };
+use tracy_client::{frame_mark, frame_name, plot, span, span_location, Client, secondary_frame_mark};
 
 /// params to `verify_accounts_hash`
 struct VerifyAccountsHashConfig {
@@ -1586,6 +1587,7 @@ impl Bank {
         let epoch = epoch_schedule.get_epoch(slot);
 
         let (rc, bank_rc_creation_time_us) = measure_us!({
+            let _span = span!("bank_rc_creation_time_us");
             let accounts_db = Arc::clone(&parent.rc.accounts.accounts_db);
             accounts_db.insert_default_bank_hash_stats(slot, parent.slot());
             BankRc {
@@ -1596,37 +1598,62 @@ impl Bank {
             }
         });
 
-        let (status_cache, status_cache_time_us) = measure_us!(Arc::clone(&parent.status_cache));
+        let (status_cache, status_cache_time_us) = measure_us!({
+            let _span = span!("status_cache_time_us");
+            Arc::clone(&parent.status_cache)
+        });
 
-        let (fee_rate_governor, fee_components_time_us) = measure_us!(
+        let (fee_rate_governor, fee_components_time_us) = measure_us!({
+            let _span = span!("fee_components_time_us");
             FeeRateGovernor::new_derived(&parent.fee_rate_governor, parent.signature_count())
-        );
+        });
 
         let bank_id = rc.bank_id_generator.fetch_add(1, Relaxed) + 1;
-        let (blockhash_queue, blockhash_queue_time_us) =
-            measure_us!(RwLock::new(parent.blockhash_queue.read().unwrap().clone()));
+        let (blockhash_queue, blockhash_queue_time_us) = measure_us!({
+            let _span = span!("blockhash_queue_time_us");
+            RwLock::new(parent.blockhash_queue.read().unwrap().clone())
+        });
 
-        let (stakes_cache, stakes_cache_time_us) =
-            measure_us!(StakesCache::new(parent.stakes_cache.stakes().clone()));
+        let (stakes_cache, stakes_cache_time_us) = measure_us!({
+            let _span = span!("stakes_cache_time_us");
+            StakesCache::new(parent.stakes_cache.stakes().clone())
+        });
 
-        let (epoch_stakes, epoch_stakes_time_us) = measure_us!(parent.epoch_stakes.clone());
+        let (epoch_stakes, epoch_stakes_time_us) = measure_us!({
+            let _span = span!("epoch_stakes_time_us");
+            parent.epoch_stakes.clone()
+        });
 
-        let (builtin_programs, builtin_programs_time_us) =
-            measure_us!(parent.builtin_programs.clone());
+        let (builtin_programs, builtin_programs_time_us) = measure_us!({
+            let _span = span!("builtin_programs_time_us");
+            parent.builtin_programs.clone()
+        });
 
-        let (rewards_pool_pubkeys, rewards_pool_pubkeys_time_us) =
-            measure_us!(parent.rewards_pool_pubkeys.clone());
+        let (rewards_pool_pubkeys, rewards_pool_pubkeys_time_us) = measure_us!({
+            let _span = span!("rewards_pool_pubkeys_time_us");
+            parent.rewards_pool_pubkeys.clone()
+        });
 
-        let (transaction_debug_keys, transaction_debug_keys_time_us) =
-            measure_us!(parent.transaction_debug_keys.clone());
+        let (transaction_debug_keys, transaction_debug_keys_time_us) = measure_us!({
+            let _span = span!("transaction_debug_keys_time_us");
+            parent.transaction_debug_keys.clone()
+        });
 
         let (transaction_log_collector_config, transaction_log_collector_config_time_us) =
-            measure_us!(parent.transaction_log_collector_config.clone());
+            measure_us!({
+                let _span = span!("transaction_log_collector_config_time_us");
+                parent.transaction_log_collector_config.clone()
+            });
 
-        let (feature_set, feature_set_time_us) = measure_us!(parent.feature_set.clone());
+        let (feature_set, feature_set_time_us) = measure_us!({
+            let _span = span!("feature_set_time_us");
+            parent.feature_set.clone()
+        });
 
         let accounts_data_size_initial = parent.load_accounts_data_size();
         parent.bank_created();
+        let _span = span!("bank_created");
+
         let mut new = Self {
             bank_freeze_or_destruction_incremented: AtomicBool::default(),
             incremental_snapshot_persistence: None,
@@ -1712,6 +1739,7 @@ impl Bank {
         };
 
         let (_, ancestors_time_us) = measure_us!({
+            let _span = span!("ancestors_time_us");
             let mut ancestors = Vec::with_capacity(1 + new.parents().len());
             ancestors.push(new.slot());
             new.parents().iter().for_each(|p| {
@@ -1723,6 +1751,7 @@ impl Bank {
         // Following code may touch AccountsDb, requiring proper ancestors
         let parent_epoch = parent.epoch();
         let (_, update_epoch_time_us) = measure_us!({
+            let _span = span!("update_epoch_time_us");
             if parent_epoch < new.epoch() {
                 new.process_new_epoch(
                     parent_epoch,
@@ -1742,6 +1771,7 @@ impl Bank {
 
         // Update sysvars before processing transactions
         let (_, update_sysvars_time_us) = measure_us!({
+            let _span = span!("update_sysvars_time_us");
             new.update_slot_hashes();
             new.update_stake_history(Some(parent_epoch));
             new.update_clock(Some(parent_epoch));
@@ -1749,7 +1779,10 @@ impl Bank {
             new.update_last_restart_slot()
         });
 
-        let (_, fill_sysvar_cache_time_us) = measure_us!(new.fill_missing_sysvar_cache_entries());
+        let (_, fill_sysvar_cache_time_us) = measure_us!({
+            let _span = span!("update_sysvars_time_us");
+            new.fill_missing_sysvar_cache_entries()
+        });
         time.stop();
 
         report_new_bank_metrics(
@@ -1796,6 +1829,9 @@ impl Bank {
         parent_height: u64,
         reward_calc_tracer: Option<impl RewardCalcTracer>,
     ) {
+       // secondary_frame_mark!();
+       let _span =  span!("epoch");
+
         let epoch = self.epoch();
         let slot = self.slot();
         let (thread_pool, thread_pool_time) = measure!(

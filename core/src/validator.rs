@@ -1,6 +1,7 @@
 //! The `validator` module hosts all the validator microservices.
 
 pub use solana_perf::report_target_features;
+
 use {
     crate::{
         accounts_hash_verifier::{AccountsHashFaultInjector, AccountsHashVerifier},
@@ -2449,6 +2450,8 @@ mod tests {
         let (sender, receiver) = bounded(0);
         let _ = thread::spawn(move || {
             validators.into_iter().for_each(|validator| {
+                let _sp = span!("hi 5");
+
                 validator.join();
             });
             sender.send(()).unwrap();

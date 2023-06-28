@@ -392,6 +392,7 @@ tokio-tungstenite = "0.17.2"
 tokio-util = "0.6"
 tonic = "0.8.3"
 tonic-build = "0.8.4"
+tracy-client = { version = "0.15.2", default-features = false, features = ["enable"] }
 trees = "0.4.2"
 tungstenite = "0.17.2"
 unix_socket2 = "0.5.4"

@@ -84,6 +84,7 @@ use {
         time::{Duration, SystemTime},
     },
 };
+use tracy_client::{frame_mark, frame_name, plot, span, Client, span_location};    
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
@@ -458,6 +459,9 @@ fn configure_banking_trace_dir_byte_limit(
 }
 
 pub fn main() {
+    let client = tracy_client::Client::start();
+    client.set_thread_name("main");
+
     let default_args = DefaultArgs::new();
     let solana_version = solana_version::version!();
     let cli_app = app(solana_version, &default_args);
