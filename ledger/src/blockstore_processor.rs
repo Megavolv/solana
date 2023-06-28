@@ -231,8 +231,6 @@ fn execute_batches_internal(
     log_messages_bytes_limit: Option<usize>,
     prioritization_fee_cache: &PrioritizationFeeCache,
 ) -> Result<ExecuteBatchesInternalMetrics> {
-    let _span = span!("execute_batches_internal");
-
     assert!(!batches.is_empty());
     let execution_timings_per_thread: Mutex<HashMap<usize, ThreadExecuteTimings>> =
         Mutex::new(HashMap::new());
@@ -245,7 +243,7 @@ fn execute_batches_internal(
                 let transaction_count =
                     transaction_batch.batch.sanitized_transactions().len() as u64;
                 let mut timings = ExecuteTimings::default();
-                let (result, _time): (Result<()>, Measure) = measure!(
+                let (result, execute_batches_time): (Result<()>, Measure) = measure!(
                     {
                         execute_batch(
                             transaction_batch,
@@ -305,8 +303,6 @@ fn rebatch_transactions<'a>(
     end: usize,
     transaction_indexes: &'a [usize],
 ) -> TransactionBatchWithIndexes<'a, 'a> {
-    let _span = span!("rebatch_transactions");
-
     let txs = &sanitized_txs[start..=end];
     let results = &lock_results[start..=end];
     let mut tx_batch = TransactionBatch::new(results.to_vec(), bank, Cow::from(txs));
@@ -332,7 +328,7 @@ fn execute_batches(
         return Ok(());
     }
     let _span = span!("execute_batches");
-    
+
     let ((lock_results, sanitized_txs), transaction_indexes): ((Vec<_>, Vec<_>), Vec<_>) = batches
         .iter()
         .flat_map(|batch| {
