@@ -36,6 +36,9 @@
 #[allow(deprecated)]
 use solana_sdk::recent_blockhashes_account;
 pub use solana_sdk::reward_type::RewardType;
+use tracy_client::{
+    frame_mark, frame_name, plot, secondary_frame_mark, span, span_location, Client,
+};
 use {
     crate::{
         account_overrides::AccountOverrides,
@@ -191,7 +194,6 @@ use {
         time::{Duration, Instant},
     },
 };
-use tracy_client::{frame_mark, frame_name, plot, span, span_location, Client, secondary_frame_mark};
 
 /// params to `verify_accounts_hash`
 struct VerifyAccountsHashConfig {
@@ -1587,7 +1589,6 @@ impl Bank {
         let epoch = epoch_schedule.get_epoch(slot);
 
         let (rc, bank_rc_creation_time_us) = measure_us!({
-            let _span = span!("bank_rc_creation_time_us");
             let accounts_db = Arc::clone(&parent.rc.accounts.accounts_db);
             accounts_db.insert_default_bank_hash_stats(slot, parent.slot());
             BankRc {
@@ -1598,61 +1599,38 @@ impl Bank {
             }
         });
 
-        let (status_cache, status_cache_time_us) = measure_us!({
-            let _span = span!("status_cache_time_us");
-            Arc::clone(&parent.status_cache)
-        });
+        let (status_cache, status_cache_time_us) =
+            measure_us!({ Arc::clone(&parent.status_cache) });
 
         let (fee_rate_governor, fee_components_time_us) = measure_us!({
-            let _span = span!("fee_components_time_us");
             FeeRateGovernor::new_derived(&parent.fee_rate_governor, parent.signature_count())
         });
 
         let bank_id = rc.bank_id_generator.fetch_add(1, Relaxed) + 1;
-        let (blockhash_queue, blockhash_queue_time_us) = measure_us!({
-            let _span = span!("blockhash_queue_time_us");
-            RwLock::new(parent.blockhash_queue.read().unwrap().clone())
-        });
+        let (blockhash_queue, blockhash_queue_time_us) =
+            measure_us!({ RwLock::new(parent.blockhash_queue.read().unwrap().clone()) });
 
-        let (stakes_cache, stakes_cache_time_us) = measure_us!({
-            let _span = span!("stakes_cache_time_us");
-            StakesCache::new(parent.stakes_cache.stakes().clone())
-        });
+        let (stakes_cache, stakes_cache_time_us) =
+            measure_us!({ StakesCache::new(parent.stakes_cache.stakes().clone()) });
 
-        let (epoch_stakes, epoch_stakes_time_us) = measure_us!({
-            let _span = span!("epoch_stakes_time_us");
-            parent.epoch_stakes.clone()
-        });
+        let (epoch_stakes, epoch_stakes_time_us) = measure_us!({ parent.epoch_stakes.clone() });
 
-        let (builtin_programs, builtin_programs_time_us) = measure_us!({
-            let _span = span!("builtin_programs_time_us");
-            parent.builtin_programs.clone()
-        });
+        let (builtin_programs, builtin_programs_time_us) =
+            measure_us!({ parent.builtin_programs.clone() });
 
-        let (rewards_pool_pubkeys, rewards_pool_pubkeys_time_us) = measure_us!({
-            let _span = span!("rewards_pool_pubkeys_time_us");
-            parent.rewards_pool_pubkeys.clone()
-        });
+        let (rewards_pool_pubkeys, rewards_pool_pubkeys_time_us) =
+            measure_us!({ parent.rewards_pool_pubkeys.clone() });
 
-        let (transaction_debug_keys, transaction_debug_keys_time_us) = measure_us!({
-            let _span = span!("transaction_debug_keys_time_us");
-            parent.transaction_debug_keys.clone()
-        });
+        let (transaction_debug_keys, transaction_debug_keys_time_us) =
+            measure_us!({ parent.transaction_debug_keys.clone() });
 
         let (transaction_log_collector_config, transaction_log_collector_config_time_us) =
-            measure_us!({
-                let _span = span!("transaction_log_collector_config_time_us");
-                parent.transaction_log_collector_config.clone()
-            });
+            measure_us!({ parent.transaction_log_collector_config.clone() });
 
-        let (feature_set, feature_set_time_us) = measure_us!({
-            let _span = span!("feature_set_time_us");
-            parent.feature_set.clone()
-        });
+        let (feature_set, feature_set_time_us) = measure_us!({ parent.feature_set.clone() });
 
         let accounts_data_size_initial = parent.load_accounts_data_size();
         parent.bank_created();
-        let _span = span!("bank_created");
 
         let mut new = Self {
             bank_freeze_or_destruction_incremented: AtomicBool::default(),
@@ -1739,7 +1717,6 @@ impl Bank {
         };
 
         let (_, ancestors_time_us) = measure_us!({
-            let _span = span!("ancestors_time_us");
             let mut ancestors = Vec::with_capacity(1 + new.parents().len());
             ancestors.push(new.slot());
             new.parents().iter().for_each(|p| {
@@ -1751,7 +1728,6 @@ impl Bank {
         // Following code may touch AccountsDb, requiring proper ancestors
         let parent_epoch = parent.epoch();
         let (_, update_epoch_time_us) = measure_us!({
-            let _span = span!("update_epoch_time_us");
             if parent_epoch < new.epoch() {
                 new.process_new_epoch(
                     parent_epoch,
@@ -1771,7 +1747,6 @@ impl Bank {
 
         // Update sysvars before processing transactions
         let (_, update_sysvars_time_us) = measure_us!({
-            let _span = span!("update_sysvars_time_us");
             new.update_slot_hashes();
             new.update_stake_history(Some(parent_epoch));
             new.update_clock(Some(parent_epoch));
@@ -1779,10 +1754,8 @@ impl Bank {
             new.update_last_restart_slot()
         });
 
-        let (_, fill_sysvar_cache_time_us) = measure_us!({
-            let _span = span!("update_sysvars_time_us");
-            new.fill_missing_sysvar_cache_entries()
-        });
+        let (_, fill_sysvar_cache_time_us) =
+            measure_us!({ new.fill_missing_sysvar_cache_entries() });
         time.stop();
 
         report_new_bank_metrics(
@@ -1829,8 +1802,8 @@ impl Bank {
         parent_height: u64,
         reward_calc_tracer: Option<impl RewardCalcTracer>,
     ) {
-       // secondary_frame_mark!();
-       let _span =  span!("epoch");
+        // secondary_frame_mark!();
+        let _span = span!("process_new_epoch");
 
         let epoch = self.epoch();
         let slot = self.slot();
@@ -1912,6 +1885,7 @@ impl Bank {
             self.epoch_reward_status,
             EpochRewardStatus::Active(_)
         ));
+        let _span = span!("deactivate_epoch_reward_status");
         self.epoch_reward_status = EpochRewardStatus::Inactive;
         if let Some(account) = self.get_account(&sysvar::epoch_rewards::id()) {
             if account.lamports() > 0 {
@@ -1938,6 +1912,8 @@ impl Bank {
         parent_block_height: u64,
         rewards_metrics: &mut RewardsMetrics,
     ) {
+        let _span = span!("begin_partitioned_rewards");
+        
         let CalculateRewardsAndDistributeVoteRewardsResult {
             total_rewards,
             distributed_rewards,
@@ -1971,6 +1947,7 @@ impl Bank {
 
     /// Process reward distribution for the block if it is inside reward interval.
     fn distribute_partitioned_epoch_rewards(&mut self) {
+        let _span = span!("distribute_partitioned_epoch_rewards");
         let EpochRewardStatus::Active(status) = &self.epoch_reward_status
             else {
                 return;
@@ -2035,6 +2012,7 @@ impl Bank {
     }
 
     fn bank_created(&self) {
+        let _span = span!("bank_created");
         self.rc
             .accounts
             .accounts_db
@@ -2043,6 +2021,7 @@ impl Bank {
     }
 
     fn bank_frozen_or_destroyed(&self) {
+        let _span = span!("bank_frozen_or_destroyed");
         if !self
             .bank_freeze_or_destruction_incremented
             .swap(true, AcqRel)
@@ -2067,6 +2046,7 @@ impl Bank {
         slot: Slot,
         data_source: CalcAccountsHashDataSource,
     ) -> Self {
+        let _span = span!("warp_from_parent");
         parent.freeze();
         parent
             .rc
@@ -2115,6 +2095,7 @@ impl Bank {
         debug_do_not_add_builtins: bool,
         accounts_data_size_initial: u64,
     ) -> Self {
+        let _span = span!("bank new_from_fields");
         let now = Instant::now();
         let ancestors = Ancestors::from(&fields.ancestors);
         // For backward compatibility, we can only serialize and deserialize
@@ -2742,6 +2723,8 @@ impl Bank {
         thread_pool: &ThreadPool,
         metrics: &mut RewardsMetrics,
     ) -> CalculateRewardsAndDistributeVoteRewardsResult {
+        let _span =  span!("calculate_rewards_and_distribute_vote_rewards new_from_fields");
+
         let PartitionedRewardsCalculation {
             vote_account_rewards,
             stake_rewards_by_partition,
@@ -2852,6 +2835,7 @@ impl Bank {
         thread_pool: &ThreadPool,
         metrics: &mut RewardsMetrics,
     ) {
+        let _span =  span!("update_rewards_with_thread_pool new_from_fields");
         let capitalization = self.capitalization();
         let PrevEpochInflationRewards {
             validator_rewards,
@@ -3309,6 +3293,7 @@ impl Bank {
         metrics: &mut RewardsMetrics,
         update_rewards_from_cached_accounts: bool,
     ) {
+        let _span =  span!("pay_validator_rewards_with_thread_pool");
         let stake_history = self.stakes_cache.stakes().history().clone();
         let vote_with_stake_delegations_map = self.load_vote_and_stake_accounts(
             thread_pool,
@@ -3368,6 +3353,7 @@ impl Bank {
         vote_rewards_expected: &DashMap<Pubkey, VoteReward>,
         partitioned_rewards: PartitionedRewardsCalculation,
     ) {
+        let _span =  span!("pay_validator_rewards_with_thread_pool");
         // put partitioned stake rewards in a hashmap
         let mut stake_rewards: HashMap<Pubkey, &StakeReward> = HashMap::default();
         partitioned_rewards
@@ -4037,6 +4023,7 @@ impl Bank {
         all_stake_rewards: &[Vec<StakeReward>],
         partition_index: u64,
     ) {
+        let _span = span!("distribute_epoch_rewards_in_partition"); 
         let pre_capitalization = self.capitalization();
         let this_partition_stake_rewards = &all_stake_rewards[partition_index as usize];
 
@@ -4420,6 +4407,7 @@ impl Bank {
     }
 
     fn burn_and_purge_account(&self, program_id: &Pubkey, mut account: AccountSharedData) {
+        let _span = span!("burn_and_purge_account");
         let old_data_size = account.data().len();
         self.capitalization.fetch_sub(account.lamports(), Relaxed);
         // Both resetting account balance to 0 and zeroing the account data
@@ -5267,6 +5255,8 @@ impl Bank {
         log_messages_bytes_limit: Option<usize>,
         programs_loaded_for_tx_batch: &LoadedProgramsForTxBatch,
     ) -> TransactionExecutionResult {
+        let _span = span!("execute_loaded_transaction"); 
+
         let prev_accounts_data_len = self.load_accounts_data_size();
         let transaction_accounts = std::mem::take(&mut loaded_transaction.accounts);
         let mut transaction_context = TransactionContext::new(
@@ -7203,6 +7193,7 @@ impl Bank {
         pubkey: &Pubkey,
         new_account: &AccountSharedData,
     ) {
+        let _span = span!("store_account_and_update_capitalization"); 
         let old_account_data_size =
             if let Some(old_account) = self.get_account_with_fixed_root(pubkey) {
                 match new_account.lamports().cmp(&old_account.lamports()) {
@@ -7294,6 +7285,8 @@ impl Bank {
         additional_builtins: Option<&[BuiltinPrototype]>,
         debug_do_not_add_builtins: bool,
     ) {
+        let _span = span!("bank finish_init");
+
         self.rewards_pool_pubkeys =
             Arc::new(genesis_config.rewards_pools.keys().cloned().collect());
 
@@ -7455,6 +7448,7 @@ impl Bank {
     }
 
     pub fn get_all_accounts_with_modified_slots(&self) -> ScanResult<Vec<PubkeyAccountSlot>> {
+        let _span =  span!("get_all_accounts_with_modified_slots");
         self.rc.accounts.load_all(&self.ancestors, self.bank_id)
     }
 
@@ -7462,6 +7456,7 @@ impl Bank {
     where
         F: FnMut(Option<(&Pubkey, AccountSharedData, Slot)>),
     {
+        let _span =  span!("scan_all_accounts_with_modified_slots");
         self.rc
             .accounts
             .scan_all(&self.ancestors, self.bank_id, scan_func)
@@ -8555,6 +8550,8 @@ impl Bank {
 
     // Compute the active feature set based on the current bank state, and return the set of newly activated features
     fn compute_active_feature_set(&mut self, allow_new_activations: bool) -> HashSet<Pubkey> {
+        let _span = span!("compute_active_feature_set");
+
         let mut active = self.feature_set.active.clone();
         let mut inactive = HashSet::new();
         let mut newly_activated = HashSet::new();
